@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-import logging
+import loggi
 import time
 import os
 import socket
