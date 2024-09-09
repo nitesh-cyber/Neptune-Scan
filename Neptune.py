@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import argparse
 import logging
 import time
@@ -8,9 +6,9 @@ import socket
 from scapy.all import IP, TCP, UDP, ICMP, sr1, sr, fragment, send
 from concurrent.futures import ThreadPoolExecutor
 
-# For NSE-like scripting, we'd need to design a plugin system
+
 def run_scripts(target_ip, port):
-    # Placeholder function for running custom scripts
+    
     print(f"Running scripts on {target_ip}:{port}")
 
 def banner():
@@ -44,7 +42,7 @@ def udp_scan(target_ip, start_port, end_port, verbose=False):
         if not response:
             open_ports.append(port)
         elif response.haslayer(ICMP) and response[ICMP].type == 3 and response[ICMP].code in [1, 2, 3, 9, 10, 13]:
-            pass  # Port is closed or unreachable
+            pass  
     return open_ports
 
 def os_fingerprinting(target_ip, verbose=False):
@@ -56,7 +54,7 @@ def os_fingerprinting(target_ip, verbose=False):
         ttl = response.ttl
         window_size = response[TCP].window
         
-        # Basic OS guesswork
+       
         os_guess = "Unknown OS"
         if ttl <= 64:
             os_guess = "Linux/Unix"
@@ -83,7 +81,7 @@ def service_detection(target_ip, port, verbose=False):
     response = sr1(pkt, timeout=1, verbose=verbose)
     
     if response and response.haslayer(TCP) and response[TCP].flags == 0x12:
-        # Placeholder for actual service detection logic
+        
         service = "Unknown"  
         return f"Port {port} - Service: {service}"
     return None
@@ -105,10 +103,10 @@ def check_root():
         exit()
 
 def main():
-    # Check if script is running as root
+    
     check_root()
 
-    # Argument parsing
+  
     parser = argparse.ArgumentParser(description="Neptune Scan - Advanced Port Scanning Tool")
     parser.add_argument("target", help="Target IP address to scan")
     parser.add_argument("port_range", help="Port range in the format <start_port-end_port>")
@@ -122,10 +120,10 @@ def main():
     
     args = parser.parse_args()
 
-    # Setup logging
+    
     logging.basicConfig(level=logging.INFO if not args.verbose else logging.DEBUG, format='%(message)s')
 
-    # Extract port range
+    
     try:
         start_port, end_port = map(int, args.port_range.split('-'))
     except ValueError:
@@ -135,15 +133,15 @@ def main():
     banner()
     start_time = time.time()
 
-    # Perform Traceroute if requested
+   
     if args.traceroute:
         perform_traceroute(args.target, args.verbose)
 
-    # Perform OS Fingerprinting if requested
+    
     if args.os_fingerprint:
         os_fingerprinting(args.target, args.verbose)
 
-    # Perform Port Scanning (SYN or UDP)
+ 
     if args.udp:
         logging.info(f"Performing UDP Scan on {args.target} for ports {start_port}-{end_port}...")
         open_ports = udp_scan(args.target, start_port, end_port, args.verbose)
@@ -151,11 +149,11 @@ def main():
         logging.info(f"Performing SYN Scan on {args.target} for ports {start_port}-{end_port}...")
         open_ports = syn_scan(args.target, start_port, end_port, args.verbose)
 
-    # Detect Firewalls if requested
+
     if args.firewall_detect:
         firewall_detection(args.target, start_port, end_port, args.verbose)
 
-    # Detect Services if requested
+    
     if args.service_detect:
         for port in open_ports:
             service_info = service_detection(args.target, port, args.verbose)
