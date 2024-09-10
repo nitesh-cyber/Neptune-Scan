@@ -2,13 +2,10 @@ import argparse
 import logging
 import time
 import os
-import socket
-from scapy.all import IP, TCP, UDP, ICMP, sr1, sr, fragment, send
+from scapy.all import IP, TCP, UDP, ICMP, sr1, sr
 from concurrent.futures import ThreadPoolExecutor
 
-
 def run_scripts(target_ip, port):
-    
     print(f"Running scripts on {target_ip}:{port}")
 
 def banner():
@@ -24,7 +21,6 @@ def banner():
     """)
 
 def syn_scan(target_ip, start_port, end_port, verbose=False):
-    """Performs a SYN scan (stealth scan)."""
     open_ports = []
     for port in range(start_port, end_port + 1):
         pkt = IP(dst=target_ip)/TCP(dport=port, flags='S')
@@ -34,27 +30,26 @@ def syn_scan(target_ip, start_port, end_port, verbose=False):
     return open_ports
 
 def udp_scan(target_ip, start_port, end_port, verbose=False):
-    """Performs a UDP scan."""
     open_ports = []
     for port in range(start_port, end_port + 1):
         pkt = IP(dst=target_ip)/UDP(dport=port)
-        response = sr(pkt, timeout=1, verbose=verbose)
-        if not response:
+        answered, unanswered = sr(pkt, timeout=1, verbose=verbose)
+        for send_pkt, response in answered:
+            if response.haslayer(ICMP) and response[ICMP].type == 3 and response[ICMP].code in [1, 2, 3, 9, 10, 13]:
+                pass
+            else:
+                open_ports.append(port)
+        if not answered:
             open_ports.append(port)
-        elif response.haslayer(ICMP) and response[ICMP].type == 3 and response[ICMP].code in [1, 2, 3, 9, 10, 13]:
-            pass  
     return open_ports
 
 def os_fingerprinting(target_ip, verbose=False):
-    """Performs basic OS fingerprinting using TCP/IP stack behavior."""
     pkt = IP(dst=target_ip)/TCP(dport=80, flags='S')
     response = sr1(pkt, timeout=1, verbose=verbose)
     
     if response:
         ttl = response.ttl
         window_size = response[TCP].window
-        
-       
         os_guess = "Unknown OS"
         if ttl <= 64:
             os_guess = "Linux/Unix"
@@ -69,25 +64,21 @@ def os_fingerprinting(target_ip, verbose=False):
         print("No response, unable to fingerprint OS")
 
 def perform_traceroute(target_ip, verbose=False):
-    """Performs a traceroute to the target IP."""
     print("Performing Traceroute...")
     result, _ = sr(IP(dst=target_ip)/ICMP(), timeout=2, verbose=verbose)
     for sent, received in result:
         print(f"{sent[IP].src} -> {received[IP].dst}")
 
 def service_detection(target_ip, port, verbose=False):
-    """Basic service detection (banner grabbing)."""
     pkt = IP(dst=target_ip)/TCP(dport=port, flags='S')
     response = sr1(pkt, timeout=1, verbose=verbose)
     
     if response and response.haslayer(TCP) and response[TCP].flags == 0x12:
-        
-        service = "Unknown"  
+        service = "Unknown"
         return f"Port {port} - Service: {service}"
     return None
 
 def firewall_detection(target_ip, start_port, end_port, verbose=False):
-    """Detects firewall presence by analyzing responses."""
     print("Performing Firewall Detection...")
     for port in range(start_port, end_port + 1):
         pkt = IP(dst=target_ip)/TCP(dport=port, flags='S')
@@ -97,16 +88,12 @@ def firewall_detection(target_ip, start_port, end_port, verbose=False):
             break
 
 def check_root():
-    """Ensure the script is running with root privileges."""
     if os.geteuid() != 0:
         print("This script must be run as root. Please use sudo.")
         exit()
 
 def main():
-    
     check_root()
-
-  
     parser = argparse.ArgumentParser(description="Neptune Scan - Advanced Port Scanning Tool")
     parser.add_argument("target", help="Target IP address to scan")
     parser.add_argument("port_range", help="Port range in the format <start_port-end_port>")
@@ -119,11 +106,8 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     
     args = parser.parse_args()
-
-    
     logging.basicConfig(level=logging.INFO if not args.verbose else logging.DEBUG, format='%(message)s')
 
-    
     try:
         start_port, end_port = map(int, args.port_range.split('-'))
     except ValueError:
@@ -133,15 +117,12 @@ def main():
     banner()
     start_time = time.time()
 
-   
     if args.traceroute:
         perform_traceroute(args.target, args.verbose)
 
-    
     if args.os_fingerprint:
         os_fingerprinting(args.target, args.verbose)
 
- 
     if args.udp:
         logging.info(f"Performing UDP Scan on {args.target} for ports {start_port}-{end_port}...")
         open_ports = udp_scan(args.target, start_port, end_port, args.verbose)
@@ -149,11 +130,9 @@ def main():
         logging.info(f"Performing SYN Scan on {args.target} for ports {start_port}-{end_port}...")
         open_ports = syn_scan(args.target, start_port, end_port, args.verbose)
 
-
     if args.firewall_detect:
         firewall_detection(args.target, start_port, end_port, args.verbose)
 
-    
     if args.service_detect:
         for port in open_ports:
             service_info = service_detection(args.target, port, args.verbose)
@@ -170,4 +149,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
