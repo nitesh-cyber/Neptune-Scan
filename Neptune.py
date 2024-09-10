@@ -92,6 +92,12 @@ def check_root():
         print("This script must be run as root. Please use sudo.")
         exit()
 
+def scan_ports(target_ip, start_port, end_port, udp, verbose):
+    if udp:
+        return udp_scan(target_ip, start_port, end_port, verbose)
+    else:
+        return syn_scan(target_ip, start_port, end_port, verbose)
+
 def main():
     check_root()
     parser = argparse.ArgumentParser(description="Neptune Scan - Advanced Port Scanning Tool")
@@ -110,8 +116,10 @@ def main():
 
     try:
         start_port, end_port = map(int, args.port_range.split('-'))
-    except ValueError:
-        print("Invalid port range format. Use <start_port-end_port>.")
+        if start_port > end_port:
+            raise ValueError("Start port must be less than or equal to end port.")
+    except ValueError as e:
+        print(f"Invalid port range format or value. {e}")
         exit()
 
     banner()
@@ -123,12 +131,7 @@ def main():
     if args.os_fingerprint:
         os_fingerprinting(args.target, args.verbose)
 
-    if args.udp:
-        logging.info(f"Performing UDP Scan on {args.target} for ports {start_port}-{end_port}...")
-        open_ports = udp_scan(args.target, start_port, end_port, args.verbose)
-    else:
-        logging.info(f"Performing SYN Scan on {args.target} for ports {start_port}-{end_port}...")
-        open_ports = syn_scan(args.target, start_port, end_port, args.verbose)
+    open_ports = scan_ports(args.target, start_port, end_port, args.udp, args.verbose)
 
     if args.firewall_detect:
         firewall_detection(args.target, start_port, end_port, args.verbose)
